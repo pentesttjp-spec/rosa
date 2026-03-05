@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rosa para Male 🌹</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Dancing+Script:wght@700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            margin: 0;
+            height: 100vh;
+            background: radial-gradient(circle at center, #2a0f1f 0%, #0f050a 70%);
+            color: #ffd1dc;
+            font-family: 'Playfair Display', serif;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .overlay {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            padding: 20px;
+            max-width: 90%;
+        }
+        
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px rgba(225, 29, 72, 0.8);
+            font-family: 'Dancing Script', cursive;
+        }
+        
+        .message {
+            font-size: 1.45rem;
+            line-height: 1.6;
+            opacity: 0;
+            transition: opacity 4s ease;
+            text-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        
+        .message.show {
+            opacity: 1;
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+        }
+        
+        button {
+            background: rgba(225, 29, 72, 0.25);
+            color: #ffd1dc;
+            border: 2px solid #e11d48;
+            padding: 12px 28px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+        
+        button:hover {
+            background: #e11d48;
+            transform: scale(1.05);
+        }
+        
+        @media (max-width: 768px) {
+            h1 { font-size: 2.8rem; }
+            .message { font-size: 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div class="overlay">
+        <h1>Para ti, Male 🌹</h1>
+        <p id="message" class="message">
+            En los momentos que no estemos juntos,<br>
+            recuérdame con esta rosa.<br>
+            <strong>Te quiero, Male</strong>
+        </p>
+    </div>
+    
+    <div class="controls">
+        <button onclick="regenerateRose()">Nueva Rosa</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let stemParticles = [];
+        let mouse = { x: 0, y: 0, active: false };
+        let width, height;
+        let centerX, centerY;
+        let formed = false;
+        let time = 0;
+
+        class Particle {
+            constructor(tx, ty, isPetal = true) {
+                this.targetX = tx;
+                this.targetY = ty;
+                this.x = centerX + (Math.random() - 0.5) * 700;
+                this.y = centerY + (Math.random() - 0.5) * 700 + 100;
+                this.vx = (Math.random() - 0.5) * 3;
+                this.vy = (Math.random() - 0.5) * 3;
+                this.size = isPetal ? 2.8 + Math.random() * 1.8 : 3;
+                this.hue = isPetal ? 330 + Math.random() * 35 : 340;
+                this.alpha = 0.9;
+            }
+            
+            update() {
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+                const dist = Math.hypot(dx, dy);
+                
+                if (dist > 1) {
+                    this.vx += dx * 0.022;
+                    this.vy += dy * 0.022;
+                }
+                
+                // Mouse interaction
+                if (mouse.active) {
+                    const mx = mouse.x - this.x;
+                    const my = mouse.y - this.y;
+                    const mdist = Math.hypot(mx, my);
+                    if (mdist < 140) {
+                        const force = (140 - mdist) / 140;
+                        this.vx -= mx * force * 0.6;
+                        this.vy -= my * force * 0.6;
+                    }
+                }
+                
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vx *= 0.94;
+                this.vy *= 0.94;
+                
+                // Gentle breathing when formed
+                if (formed) {
+                    this.x += Math.sin(time * 0.03 + this.targetX) * 0.18;
+                    this.y += Math.cos(time * 0.025 + this.targetY) * 0.12;
+                }
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = `hsl(${this.hue}, 92%, 68%)`;
+                ctx.shadowBlur = 22;
+                ctx.shadowColor = `hsl(${this.hue}, 100%, 75%)`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            
+            centerX = width / 2;
+            centerY = height / 2 - 40;
+        }
+
+        function generateRose() {
+            particles = [];
+            stemParticles = [];
+            formed = false;
+            time = 0;
+            
+            // Stem
+            const stemX = centerX - 8;
+            for (let i = 0; i < 28; i++) {
+                const progress = i / 27;
+                const y = centerY + 220 - progress * 190;
+                const x = stemX + Math.sin(progress * Math.PI) * 12;
+                stemParticles.push({
+                    x: x,
+                    y: y,
+                    baseX: x
+                });
+            }
+            
+            // Rose petals using rhodonea curve (5 petals)
+            const numPoints = 920;
+            const k = 5;
+            const baseRadius = Math.min(width, height) * 0.28;
+            
+            for (let i = 0; i < numPoints; i++) {
+                const angle = (i / numPoints) * Math.PI * 2 * 3.5;
+                let r = baseRadius * Math.pow(Math.abs(Math.cos(k * angle)), 0.8);
+                
+                // Multiple layers for volume
+                const layer = Math.random();
+                r += layer * 22;
+                
+                const tx = centerX + r * Math.cos(angle) * 0.95;
+                const ty = centerY + r * Math.sin(angle) * 0.88 - 15;
+                
+                const p = new Particle(tx, ty, true);
+                particles.push(p);
+            }
+            
+            // Center of the rose (more dense)
+            for (let i = 0; i < 120; i++) {
+                const a = Math.random() * Math.PI * 2;
+                const rad = 28 * Math.random();
+                const tx = centerX + Math.cos(a) * rad * 0.6;
+                const ty = centerY + Math.sin(a) * rad * 0.55 - 8;
+                const p = new Particle(tx, ty, true);
+                p.size = 1.8 + Math.random() * 1.2;
+                p.hue = 350;
+                particles.push(p);
+            }
+            
+            // Show message after some time
+            setTimeout(() => {
+                if (particles.length > 0) {
+                    formed = true;
+                    document.getElementById('message').classList.add('show');
+                }
+            }, 3200);
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(15, 5, 10, 0.12)';
+            ctx.fillRect(0, 0, width, height);
+            
+            time += 1;
+            
+            // Draw stem
+            ctx.strokeStyle = '#145214';
+            ctx.lineWidth = 11;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#1e6b1e';
+            ctx.beginPath();
+            ctx.moveTo(centerX - 12, centerY + 195);
+            ctx.quadraticCurveTo(centerX - 35, centerY + 80, centerX - 6, centerY - 45);
+            ctx.stroke();
+            
+            // Leaves (simple)
+            ctx.fillStyle = '#1e6b1e';
+            ctx.beginPath();
+            ctx.ellipse(centerX - 48, centerY + 55, 38, 14, -0.9, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(centerX + 32, centerY + 95, 34, 13, 0.7, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Update and draw stem particles
+            stemParticles.forEach(s => {
+                ctx.fillStyle = '#1e5a1e';
+                ctx.fillRect(s.x - 3, s.y, 6, 4);
+            });
+            
+            // Update and draw flower particles
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            
+            requestAnimationFrame(animate);
+        }
+
+        function regenerateRose() {
+            document.getElementById('message').classList.remove('show');
+            generateRose();
+        }
+
+        // Mouse / touch events
+        function updateMouse(e) {
+            mouse.x = e.clientX || (e.touches && e.touches[0].clientX);
+            mouse.y = e.clientY || (e.touches && e.touches[0].clientY);
+            mouse.active = true;
+        }
+        
+        window.addEventListener('resize', () => {
+            resize();
+            generateRose();
+        });
+        
+        canvas.addEventListener('mousemove', updateMouse);
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            updateMouse(e);
+        });
+        
+        canvas.addEventListener('mouseleave', () => mouse.active = false);
+        canvas.addEventListener('touchend', () => mouse.active = false);
+
+        // Init
+        function init() {
+            resize();
+            generateRose();
+            animate();
+        }
+        
+        window.onload = init;
+    </script>
+</body>
+</html>
